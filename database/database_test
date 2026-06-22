@@ -1,0 +1,46 @@
+import sqlite3
+from pathlib import Path
+
+
+def test() -> None:
+    db_path = Path(__file__).resolve().parent / "database.sqlite"
+
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+
+        tables = cursor.execute("""
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name NOT LIKE 'sqlite_%';
+        """).fetchall()
+
+        if not tables:
+            print("Database is empty.")
+            return
+
+        for (table_name,) in tables:
+            print(f"\n=== {table_name} ===")
+
+            columns = cursor.execute(
+                f"PRAGMA table_info({table_name});"
+            ).fetchall()
+
+            print("Columns:")
+            print(" | ".join(column[1] for column in columns))
+
+            rows = cursor.execute(
+                f"SELECT * FROM {table_name};"
+            ).fetchall()
+
+            if not rows:
+                print("(empty)")
+                continue
+
+            print("Rows:")
+            for row in rows:
+                print(row)
+
+
+if __name__ == "__main__":
+    test()

@@ -10,7 +10,8 @@ class ChessApp:
         self.container = tk.Frame(root)
         self.container.pack(fill="both", expand=True)
         self._current: tk.Frame | None = None
-        self.show_menu()
+        self.user_id = None
+        self.show_login()
 
     def _switch(self, factory) -> None:
         if self._current is not None:
@@ -20,6 +21,15 @@ class ChessApp:
             self._current.destroy()
         self._current = factory(self.container, self)
         self._current.pack(fill="both", expand=True)
+
+    def set_user(self, user_id) -> None:
+        self.user_id = user_id
+
+    def show_login(self) -> None:
+        self._switch(screens.LoginScreen)
+
+    def show_register(self) -> None:
+        self._switch(screens.RegisterScreen)
 
     def show_menu(self) -> None:
         self._switch(screens.MenuScreen)
@@ -40,6 +50,7 @@ class ChessApp:
     def show_network_game(self, client, server) -> None:
         self._switch(lambda master, app: screens.NetworkGameScreen(
             master, app, client, server))
+
 
     def quit_app(self) -> None:
         if self._current is not None:

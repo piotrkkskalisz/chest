@@ -23,7 +23,7 @@ PROMOTION_LABELS = (("Q", "Hetman"), ("R", "Wieża"), ("B", "Goniec"), ("N", "Sk
 
 
 class BoardView(tk.Frame):
-    def __init__(self, master, on_move, square_size: int = 64):
+    def __init__(self, master, on_move, square_size: int = 56):
         super().__init__(master)
         self._on_move = on_move
         self._board = chess.Board()

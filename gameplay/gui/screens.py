@@ -2,13 +2,17 @@ import queue
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from tkinter import simpledialog
+
+from tkinter import messagebox
+
 
 from ..game_logic import game
 from ..network import protocol
 from ..network.client import NetworkClient
 from ..network.server import GameServer, local_ip_address
 from .board_view import BoardView
-
+from .. import auth
 
 COLOR_NAMES = {game.WHITE: "Białe", game.BLACK: "Czarne"}
 ENGINE_POLL_MS = 100
@@ -30,6 +34,130 @@ def status_text(status: str, turn: str, winner: str | None) -> str:
         return f"Szach! Ruch: {COLOR_NAMES[turn]}"
     return f"Ruch: {COLOR_NAMES[turn]}"
 
+class LoginScreen(tk.Frame):
+    def __init__(self, master, app):
+        super().__init__(master)
+        self.app = app
+
+        tk.Label(self, text=" Szachy", font=TITLE_FONT, pady=20).pack()
+        tk.Label(self, text="Logowanie", font=("Segoe UI", 16, "bold")).pack(pady=10)
+
+        tk.Label(self, text="Login:", font=BUTTON_FONT).pack()
+        self.username_entry = tk.Entry(self, font=("Segoe UI", 12), width=24)
+        self.username_entry.pack(pady=5)
+
+        tk.Label(self, text="Hasło:", font=BUTTON_FONT).pack()
+        self.password_entry = tk.Entry(
+            self,
+            font=("Segoe UI", 12),
+            show="*",
+            width=24
+        )
+        self.password_entry.pack(pady=5)
+
+        tk.Button(
+            self,
+            text="Zaloguj",
+            font=BUTTON_FONT,
+            width=20,
+            command= self.login
+        ).pack(pady=12)
+
+        tk.Button(
+            self,
+            text="Załóż konto",
+            font=("Segoe UI", 11),
+            command= self.app.show_register
+        ).pack()
+
+    def login(self):
+        user_id = auth.login(self.username_entry.get().strip(),self.password_entry.get()) 
+        if user_id is None:
+            self.failure_login()
+
+        else:
+            self.app.set_user(user_id)
+            self.app.show_menu()
+
+    def failure_login(self):
+        messagebox.showerror(
+            "Logowanie",
+            "Nieprawidłowy login lub hasło."
+        )
+
+        self.password_entry.delete(0, tk.END)
+        self.password_entry.focus_set()        
+
+
+class RegisterScreen(tk.Frame):
+    def __init__(self, master, app):
+        super().__init__(master)
+        self.app = app
+
+        tk.Label(self, text="Szachy", font=TITLE_FONT, pady=20).pack()
+        tk.Label(self, text="Rejestracja", font=("Segoe UI", 16, "bold")).pack(pady=10)
+
+        tk.Label(self, text="Login:", font=BUTTON_FONT).pack()
+        self.username_entry = tk.Entry(self, font=("Segoe UI", 12), width=24)
+        self.username_entry.pack(pady=5)
+
+        tk.Label(self, text="Hasło:", font=BUTTON_FONT).pack()
+        self.password_entry = tk.Entry(
+            self,
+            font=("Segoe UI", 12),
+            show="*",
+            width=24
+        )
+        self.password_entry.pack(pady=5)
+
+        tk.Label(self, text="Powtórz hasło:", font=BUTTON_FONT).pack()
+        self.repeat_password_entry = tk.Entry(
+            self,
+            font=("Segoe UI", 12),
+            show="*",
+            width=24
+        )
+        self.repeat_password_entry.pack(pady=5)
+
+        tk.Button(
+            self,
+            text="Załóż konto",
+            font=BUTTON_FONT,
+            width=20,
+            command=self.register
+        ).pack(pady=12)
+
+        tk.Button(
+            self,
+            text="Powrót do logowania",
+            font=("Segoe UI", 11),
+            command=self.app.show_login
+        ).pack()
+
+    def register(self):
+        username = self.username_entry.get().strip()
+        password = self.password_entry.get()
+        repeat_password = self.repeat_password_entry.get()
+
+        if password != repeat_password:
+            self.failure_register("Hasła nie są identyczne.")
+            return
+
+        user_id = auth.register(username, password)
+
+        if user_id is None:
+            self.failure_register("Użytkownik o tej nazwie już istnieje.")
+            return
+
+        self.app.set_user(user_id)
+        self.app.show_menu()
+
+    def failure_register(self, message: str):
+        messagebox.showerror("Rejestracja", message)
+
+        self.password_entry.delete(0, tk.END)
+        self.repeat_password_entry.delete(0, tk.END)
+        self.password_entry.focus_set()
 
 class MenuScreen(tk.Frame):
     def __init__(self, master, app):
@@ -74,7 +202,6 @@ class BaseGameScreen(tk.Frame):
         scrollbar.config(command=self.history_list.yview)
         self.controls = tk.Frame(panel)
         self.controls.pack(fill="x", pady=8)
-        self._build_controls()
         tk.Button(panel, text="Menu główne", font=("Segoe UI", 11),
                   command=self.app.show_menu).pack(fill="x", pady=4)
 
@@ -100,17 +227,45 @@ class BaseGameScreen(tk.Frame):
 class LocalGameScreen(BaseGameScreen):
     def __init__(self, master, app):
         super().__init__(master, app, "Historia ruchów")
-        self.game = game.Game()
+        self.game = game.Game(app.user_id)
+        self._build_controls()
         self.board_view.set_interactive({game.WHITE, game.BLACK})
         self._refresh()
 
     def _build_controls(self) -> None:
         tk.Button(self.controls, text="Nowa gra", font=("Segoe UI", 11),
                   command=self._new_game).pack(fill="x", pady=2)
-        tk.Button(self.controls, text="Zapisz partię (PGN)", font=("Segoe UI", 11),
-                  command=self._save).pack(fill="x", pady=2)
-        tk.Button(self.controls, text="Wczytaj partię (PGN)", font=("Segoe UI", 11),
-                  command=self._load).pack(fill="x", pady=2)
+        tk.Button(self.controls, text="Zapisz partię", font=("Segoe UI", 11),
+                  command=self.game.save_game).pack(fill="x", pady=2)
+        tk.Button(self.controls, text="Wczytaj partię", font=("Segoe UI", 11),
+                  command=self.choose_game_to_load).pack(fill="x", pady=2)
+
+    def choose_game_to_load(self):
+        games = self.game.load_all_games()
+
+        if not games:
+            messagebox.showinfo("Informacja", "Brak zapisanych gier.")
+            return
+        """
+        game_id = simpledialog.askinteger("Wczytaj grę",f"Dostępne gry:\n{games}\n\nPodaj ID gry:")
+
+        if game_id is None:
+            return
+
+        self.game.load_game(game_id)
+        """
+
+        dialog = LoadGameDialog(self, games)
+        dialog.grab_set()
+        dialog.wait_window()
+
+        if dialog.selected_game is None:
+            return
+
+        self.game.load_game(dialog.selected_game)
+
+        self._refresh()
+
 
     def _new_game(self) -> None:
         self.game.reset()
@@ -160,9 +315,11 @@ class ComputerGameScreen(BaseGameScreen):
         super().__init__(master, app, "Historia ruchów")
         self.human_color = human_color
         if human_color == game.WHITE:
-            self.game = game.Game(black_provider=provider)
+            self.game = game.Game(app.user_id,  black_provider=provider)
         else:
-            self.game = game.Game(white_provider=provider)
+            self.game = game.Game(app.user_id, white_provider=provider)
+        self._build_controls()
+
         self._engine_queue: "queue.Queue[tuple[str, str]]" = queue.Queue()
         self.board_view.set_orientation(human_color)
         self.board_view.set_interactive({human_color})
@@ -246,6 +403,8 @@ class NetworkGameScreen(BaseGameScreen):
         self.my_color: str | None = None
         self.turn = game.WHITE
         self.finished = False
+        self._build_controls()
+
         self.board_view.set_interactive(set())
         self.status_var.set("Oczekiwanie na połączenie...")
         self.after(NETWORK_POLL_MS, self._poll_network)
@@ -434,3 +593,72 @@ class NetworkSetupScreen(tk.Frame):
             messagebox.showerror("Połączenie", f"Nie można połączyć: {error}")
             return
         self.app.show_network_game(client, None)
+
+
+class LoadGameDialog(tk.Toplevel):
+    def __init__(self, master, games):
+        super().__init__(master)
+
+        self.title("Wczytaj grę")
+        self.resizable(False, False)
+
+        self.selected_game = None
+
+        tk.Label(
+            self,
+            text="Wybierz zapisaną grę",
+            font=("Segoe UI", 14, "bold")
+        ).pack(pady=10)
+
+        container = tk.Frame(self)
+        container.pack(padx=10, pady=10)
+
+        for i, (game_id, date) in enumerate(games):
+
+            card = tk.LabelFrame(
+                container,
+                text=f"Gra #{game_id}",
+                padx=10,
+                pady=10
+            )
+
+            row = i // 3
+            column = i % 3
+
+            card.grid(
+                row=row,
+                column=column,
+                padx=8,
+                pady=8,
+                sticky="nsew"
+            )
+
+            tk.Label(
+                card,
+                text=date,
+                font=("Segoe UI", 10)
+            ).pack(pady=(0, 8))
+
+            tk.Label(
+                card,
+                text="♟\nMiniatura\n(szachownica)",
+                width=18,
+                height=6,
+                relief="solid"
+            ).pack()
+
+            tk.Button(
+                card,
+                text="Wybierz",
+                command=lambda id=game_id: self._select(id)
+            ).pack(fill="x", pady=(8, 0))
+
+        tk.Button(
+            self,
+            text="Anuluj",
+            command=self.destroy
+        ).pack(pady=(0, 10))
+
+    def _select(self, game_id):
+        self.selected_game = game_id
+        self.destroy()

@@ -2,6 +2,9 @@ import os
 import platform
 from pathlib import Path
 from typing import Literal, override
+from database import database
+from io import StringIO
+
 
 import chess
 import chess.engine
@@ -145,8 +148,9 @@ class ComputerMoveProvider(MoveProvider):
 
 
 class Game:
-    def __init__(self, white_provider: MoveProvider | None = None,
+    def __init__(self, user_id: int, white_provider: MoveProvider | None = None,
                  black_provider: MoveProvider | None = None):
+        self.user_id = user_id
         self.move_white_provider = white_provider or HumanMoveProvider()
         self.move_black_provider = black_provider or HumanMoveProvider()
         self._board = chess.Board()
@@ -268,6 +272,9 @@ class Game:
         self._board.reset()
         self._san_history = []
 
+    def load_all_games(self):
+        return database.load_all_games(self.user_id)
+    
     def to_pgn(self) -> str:
         game = chess.pgn.Game()
         node: chess.pgn.GameNode = game
@@ -276,12 +283,23 @@ class Game:
         game.headers["Result"] = self._board.result()
         return str(game)
 
+    def save_game(self) -> None:
+        database.save_game(self.user_id, self.to_pgn())
+
+    def load_game(self, game_id: int) -> None:
+        pgn = database.load_game(game_id)
+        if pgn is None:
+            raise ValueError("Game not found.")
+
+        self.load_pgn(pgn)
+
+
     def save_pgn(self, path: str) -> None:
         Path(path).write_text(self.to_pgn(), encoding="utf-8")
 
-    def load_pgn(self, path: str) -> None:
-        with open(path, "r", encoding="utf-8") as handle:
-            parsed = chess.pgn.read_game(handle)
+    def load_pgn(self, pgn: str) -> None:
+        parsed = chess.pgn.read_game(StringIO(pgn))
+
         if parsed is None:
             raise ValueError("No game found in PGN file.")
         self._board = parsed.board()
