@@ -1,25 +1,19 @@
 import queue
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox
-from tkinter import simpledialog
-
 from tkinter import messagebox
-
 
 from ..game_logic import game
 from ..network import protocol
 from ..network.client import NetworkClient
 from ..network.server import GameServer, local_ip_address
 from .board_view import BoardView
+from . import theme
 from .. import auth
 
 COLOR_NAMES = {game.WHITE: "Białe", game.BLACK: "Czarne"}
 ENGINE_POLL_MS = 100
 NETWORK_POLL_MS = 100
-TITLE_FONT = ("Segoe UI", 22, "bold")
-BUTTON_FONT = ("Segoe UI", 13)
-STATUS_FONT = ("Segoe UI", 14, "bold")
 
 
 def status_text(status: str, turn: str, winner: str | None) -> str:
@@ -34,117 +28,99 @@ def status_text(status: str, turn: str, winner: str | None) -> str:
         return f"Szach! Ruch: {COLOR_NAMES[turn]}"
     return f"Ruch: {COLOR_NAMES[turn]}"
 
+
+def _centered_card(screen: tk.Frame, pad_x: int = 36, pad_y: int = 28) -> tk.Frame:
+    card = theme.card(screen)
+    card.place(relx=0.5, rely=0.5, anchor="center")
+    inner = tk.Frame(card, bg=theme.SURFACE)
+    inner.pack(padx=pad_x, pady=pad_y)
+    return inner
+
+
 class LoginScreen(tk.Frame):
     def __init__(self, master, app):
-        super().__init__(master)
+        super().__init__(master, bg=theme.BG)
         self.app = app
+        inner = _centered_card(self)
 
-        tk.Label(self, text=" Szachy", font=TITLE_FONT, pady=20).pack()
-        tk.Label(self, text="Logowanie", font=("Segoe UI", 16, "bold")).pack(pady=10)
+        theme.title(inner, "♛  Szachy", size=30).pack(pady=(0, 4))
+        theme.subtitle(inner, "Logowanie").pack(pady=(0, 18))
 
-        tk.Label(self, text="Login:", font=BUTTON_FONT).pack()
-        self.username_entry = tk.Entry(self, font=("Segoe UI", 12), width=24)
-        self.username_entry.pack(pady=5)
+        theme.label(inner, "Login:").pack(anchor="w")
+        self.username_entry = theme.entry(inner, width=26)
+        self.username_entry.pack(pady=(2, 12), ipady=4)
 
-        tk.Label(self, text="Hasło:", font=BUTTON_FONT).pack()
-        self.password_entry = tk.Entry(
-            self,
-            font=("Segoe UI", 12),
-            show="*",
-            width=24
-        )
-        self.password_entry.pack(pady=5)
+        theme.label(inner, "Hasło:").pack(anchor="w")
+        self.password_entry = theme.entry(inner, show="*", width=26)
+        self.password_entry.pack(pady=(2, 18), ipady=4)
+        self.password_entry.bind("<Return>", lambda _e: self.login())
 
-        tk.Button(
-            self,
-            text="Zaloguj",
-            font=BUTTON_FONT,
-            width=20,
-            command= self.login
-        ).pack(pady=12)
-
-        tk.Button(
-            self,
-            text="Załóż konto",
-            font=("Segoe UI", 11),
-            command= self.app.show_register
-        ).pack()
+        theme.Button(inner, "Zaloguj", command=self.login).pack(fill="x")
+        theme.Button(inner, "Załóż konto", kind="ghost",
+                     command=self.app.show_register).pack(fill="x", pady=(10, 0))
+        self.username_entry.focus_set()
 
     def login(self):
-        user_id = auth.login(self.username_entry.get().strip(),self.password_entry.get()) 
+        username = self.username_entry.get().strip()
+        password = self.password_entry.get()
+        if not username or not password:
+            messagebox.showwarning("Logowanie", "Podaj login i hasło.")
+            return
+        user_id = auth.login(username, password)
         if user_id is None:
             self.failure_login()
-
         else:
             self.app.set_user(user_id)
             self.app.show_menu()
 
     def failure_login(self):
-        messagebox.showerror(
-            "Logowanie",
-            "Nieprawidłowy login lub hasło."
-        )
-
+        messagebox.showerror("Logowanie", "Nieprawidłowy login lub hasło.")
         self.password_entry.delete(0, tk.END)
-        self.password_entry.focus_set()        
+        self.password_entry.focus_set()
 
 
 class RegisterScreen(tk.Frame):
     def __init__(self, master, app):
-        super().__init__(master)
+        super().__init__(master, bg=theme.BG)
         self.app = app
+        inner = _centered_card(self)
 
-        tk.Label(self, text="Szachy", font=TITLE_FONT, pady=20).pack()
-        tk.Label(self, text="Rejestracja", font=("Segoe UI", 16, "bold")).pack(pady=10)
+        theme.title(inner, "♛  Szachy", size=30).pack(pady=(0, 4))
+        theme.subtitle(inner, "Rejestracja").pack(pady=(0, 18))
 
-        tk.Label(self, text="Login:", font=BUTTON_FONT).pack()
-        self.username_entry = tk.Entry(self, font=("Segoe UI", 12), width=24)
-        self.username_entry.pack(pady=5)
+        theme.label(inner, "Login:").pack(anchor="w")
+        self.username_entry = theme.entry(inner, width=26)
+        self.username_entry.pack(pady=(2, 12), ipady=4)
 
-        tk.Label(self, text="Hasło:", font=BUTTON_FONT).pack()
-        self.password_entry = tk.Entry(
-            self,
-            font=("Segoe UI", 12),
-            show="*",
-            width=24
-        )
-        self.password_entry.pack(pady=5)
+        theme.label(inner, "Hasło:").pack(anchor="w")
+        self.password_entry = theme.entry(inner, show="*", width=26)
+        self.password_entry.pack(pady=(2, 12), ipady=4)
 
-        tk.Label(self, text="Powtórz hasło:", font=BUTTON_FONT).pack()
-        self.repeat_password_entry = tk.Entry(
-            self,
-            font=("Segoe UI", 12),
-            show="*",
-            width=24
-        )
-        self.repeat_password_entry.pack(pady=5)
+        theme.label(inner, "Powtórz hasło:").pack(anchor="w")
+        self.repeat_password_entry = theme.entry(inner, show="*", width=26)
+        self.repeat_password_entry.pack(pady=(2, 18), ipady=4)
 
-        tk.Button(
-            self,
-            text="Załóż konto",
-            font=BUTTON_FONT,
-            width=20,
-            command=self.register
-        ).pack(pady=12)
-
-        tk.Button(
-            self,
-            text="Powrót do logowania",
-            font=("Segoe UI", 11),
-            command=self.app.show_login
-        ).pack()
+        theme.Button(inner, "Załóż konto", command=self.register).pack(fill="x")
+        theme.Button(inner, "Powrót do logowania", kind="ghost",
+                     command=self.app.show_login).pack(fill="x", pady=(10, 0))
+        self.username_entry.focus_set()
 
     def register(self):
         username = self.username_entry.get().strip()
         password = self.password_entry.get()
         repeat_password = self.repeat_password_entry.get()
 
+        if not username or not password:
+            self.failure_register("Podaj login i hasło.")
+            return
+        if len(password) < 4:
+            self.failure_register("Hasło musi mieć co najmniej 4 znaki.")
+            return
         if password != repeat_password:
             self.failure_register("Hasła nie są identyczne.")
             return
 
         user_id = auth.register(username, password)
-
         if user_id is None:
             self.failure_register("Użytkownik o tej nazwie już istnieje.")
             return
@@ -154,59 +130,79 @@ class RegisterScreen(tk.Frame):
 
     def failure_register(self, message: str):
         messagebox.showerror("Rejestracja", message)
-
         self.password_entry.delete(0, tk.END)
         self.repeat_password_entry.delete(0, tk.END)
         self.password_entry.focus_set()
 
+
 class MenuScreen(tk.Frame):
     def __init__(self, master, app):
-        super().__init__(master)
+        super().__init__(master, bg=theme.BG)
         self.app = app
-        tk.Label(self, text="♛  Szachy", font=TITLE_FONT, pady=24).pack()
+        inner = _centered_card(self, pad_x=48, pad_y=36)
+
+        theme.title(inner, "♛  Szachy", size=34).pack(pady=(0, 6))
+        theme.label(inner, "Wybierz tryb gry", muted=True).pack(pady=(0, 22))
+
         options = (
-            ("Gra lokalna (dwie osoby)", self.app.show_local_game),
-            ("Gra z komputerem", self.app.show_computer_setup),
-            ("Gra w sieci LAN", self.app.show_network_setup),
-            ("Wyjście", self.app.quit_app),
+            ("Gra lokalna (dwie osoby)", self.app.show_local_game, "primary"),
+            ("Gra z komputerem", self.app.show_computer_setup, "ghost"),
+            ("Gra w sieci LAN", self.app.show_network_setup, "ghost"),
         )
-        for text, command in options:
-            tk.Button(self, text=text, font=BUTTON_FONT, width=26, pady=8,
-                      command=command).pack(pady=6)
-        tk.Label(self, text="", pady=12).pack()
+        for text, command, kind in options:
+            theme.Button(inner, text, command=command, kind=kind).pack(
+                fill="x", pady=5, ipady=2)
+        theme.Button(inner, "Wyjście", command=self.app.quit_app,
+                     kind="danger").pack(fill="x", pady=(18, 0))
 
 
 class BaseGameScreen(tk.Frame):
     def __init__(self, master, app, title: str):
-        super().__init__(master)
+        super().__init__(master, bg=theme.BG)
         self.app = app
+
         self.status_var = tk.StringVar(value="")
-        tk.Label(self, textvariable=self.status_var, font=STATUS_FONT,
-                 pady=8).grid(row=0, column=0, columnspan=2, sticky="ew")
+        status = tk.Label(self, textvariable=self.status_var,
+                          font=theme.ui_font(15, bold=True), bg=theme.SURFACE,
+                          fg=theme.TEXT, pady=12)
+        status.grid(row=0, column=0, columnspan=2, sticky="ew")
+
         self.board_view = BoardView(self, self.handle_user_move)
-        self.board_view.grid(row=1, column=0, padx=12, pady=12)
+        self.board_view.grid(row=1, column=0, sticky="nsew", padx=16, pady=16)
+
+
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
         self._build_side_panel(title)
 
     def _build_side_panel(self, title: str) -> None:
-        panel = tk.Frame(self)
-        panel.grid(row=1, column=1, sticky="ns", padx=12, pady=12)
-        tk.Label(panel, text=title, font=("Segoe UI", 13, "bold")).pack(anchor="w")
-        list_frame = tk.Frame(panel)
-        list_frame.pack(fill="both", expand=True, pady=8)
+        panel = tk.Frame(self, bg=theme.SURFACE, highlightbackground=theme.BORDER,
+                         highlightthickness=1)
+        panel.grid(row=1, column=1, sticky="ns", padx=(0, 16), pady=16)
+        inner = tk.Frame(panel, bg=theme.SURFACE)
+        inner.pack(fill="both", expand=True, padx=14, pady=14)
+
+        theme.subtitle(inner, title, size=13).pack(anchor="w")
+
+        list_frame = tk.Frame(inner, bg=theme.SURFACE)
+        list_frame.pack(fill="both", expand=True, pady=10)
         scrollbar = tk.Scrollbar(list_frame)
         scrollbar.pack(side="right", fill="y")
-        self.history_list = tk.Listbox(list_frame, width=22, height=16,
-                                       font=("Consolas", 11),
-                                       yscrollcommand=scrollbar.set)
+        self.history_list = tk.Listbox(
+            list_frame, width=24, height=18, font=theme.mono_font(11),
+            bg=theme.SURFACE_LIGHT, fg=theme.TEXT, relief="flat",
+            borderwidth=0, highlightthickness=0,
+            selectbackground=theme.ACCENT, selectforeground=theme.TEXT_ON_ACCENT,
+            yscrollcommand=scrollbar.set)
         self.history_list.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self.history_list.yview)
-        self.controls = tk.Frame(panel)
-        self.controls.pack(fill="x", pady=8)
-        tk.Button(panel, text="Menu główne", font=("Segoe UI", 11),
-                  command=self.app.show_menu).pack(fill="x", pady=4)
 
-    def _build_controls(self) -> None:
-        pass
+        self.controls = tk.Frame(inner, bg=theme.SURFACE)
+        self.controls.pack(fill="x", pady=8)
+
+        theme.Button(inner, "Menu główne", kind="ghost",
+                     command=self.app.show_menu).pack(fill="x", pady=(8, 0))
 
     def handle_user_move(self, origin: str, target: str, promotion: str | None) -> None:
         raise NotImplementedError
@@ -233,27 +229,25 @@ class LocalGameScreen(BaseGameScreen):
         self._refresh()
 
     def _build_controls(self) -> None:
-        tk.Button(self.controls, text="Nowa gra", font=("Segoe UI", 11),
-                  command=self._new_game).pack(fill="x", pady=2)
-        tk.Button(self.controls, text="Zapisz partię", font=("Segoe UI", 11),
-                  command=self.game.save_game).pack(fill="x", pady=2)
-        tk.Button(self.controls, text="Wczytaj partię", font=("Segoe UI", 11),
-                  command=self.choose_game_to_load).pack(fill="x", pady=2)
+        theme.Button(self.controls, "Nowa gra", kind="ghost",
+                     command=self._new_game).pack(fill="x", pady=3)
+        theme.Button(self.controls, "Zapisz partię", kind="ghost",
+                     command=self._save_to_db).pack(fill="x", pady=3)
+        theme.Button(self.controls, "Wczytaj partię", kind="ghost",
+                     command=self.choose_game_to_load).pack(fill="x", pady=3)
+
+    def _save_to_db(self) -> None:
+        try:
+            self.game.save_game()
+            messagebox.showinfo("Zapis", "Partia została zapisana.")
+        except Exception as error:
+            messagebox.showerror("Zapis", f"Nie udało się zapisać partii:\n{error}")
 
     def choose_game_to_load(self):
         games = self.game.load_all_games()
-
         if not games:
             messagebox.showinfo("Informacja", "Brak zapisanych gier.")
             return
-        """
-        game_id = simpledialog.askinteger("Wczytaj grę",f"Dostępne gry:\n{games}\n\nPodaj ID gry:")
-
-        if game_id is None:
-            return
-
-        self.game.load_game(game_id)
-        """
 
         dialog = LoadGameDialog(self, games)
         dialog.grab_set()
@@ -261,11 +255,12 @@ class LocalGameScreen(BaseGameScreen):
 
         if dialog.selected_game is None:
             return
-
-        self.game.load_game(dialog.selected_game)
-
+        try:
+            self.game.load_game(dialog.selected_game)
+        except ValueError as error:
+            messagebox.showerror("Wczytywanie", str(error))
+            return
         self._refresh()
-
 
     def _new_game(self) -> None:
         self.game.reset()
@@ -292,30 +287,13 @@ class LocalGameScreen(BaseGameScreen):
                                             self.game.current_player,
                                             self.game.winner()))
 
-    def _save(self) -> None:
-        path = filedialog.asksaveasfilename(defaultextension=".pgn",
-                                            initialdir="saves",
-                                            filetypes=[("PGN", "*.pgn")])
-        if path:
-            self.game.save_pgn(path)
-
-    def _load(self) -> None:
-        path = filedialog.askopenfilename(initialdir="saves",
-                                          filetypes=[("PGN", "*.pgn")])
-        if path:
-            try:
-                self.game.load_pgn(path)
-                self._refresh()
-            except (ValueError, OSError) as error:
-                messagebox.showerror("Błąd", str(error))
-
 
 class ComputerGameScreen(BaseGameScreen):
-    def __init__(self, master, app, human_color: str, provider: game.ComputerMoveProvider):
+    def __init__(self, master, app, human_color: str, provider):
         super().__init__(master, app, "Historia ruchów")
         self.human_color = human_color
         if human_color == game.WHITE:
-            self.game = game.Game(app.user_id,  black_provider=provider)
+            self.game = game.Game(app.user_id, black_provider=provider)
         else:
             self.game = game.Game(app.user_id, white_provider=provider)
         self._build_controls()
@@ -327,8 +305,8 @@ class ComputerGameScreen(BaseGameScreen):
         self._maybe_engine_move()
 
     def _build_controls(self) -> None:
-        tk.Button(self.controls, text="Nowa gra", font=("Segoe UI", 11),
-                  command=self._new_game).pack(fill="x", pady=2)
+        theme.Button(self.controls, "Nowa gra", kind="ghost",
+                     command=self._new_game).pack(fill="x", pady=3)
 
     def _new_game(self) -> None:
         self.game.reset()
@@ -410,8 +388,8 @@ class NetworkGameScreen(BaseGameScreen):
         self.after(NETWORK_POLL_MS, self._poll_network)
 
     def _build_controls(self) -> None:
-        tk.Button(self.controls, text="Poddaj się", font=("Segoe UI", 11),
-                  command=self._resign).pack(fill="x", pady=2)
+        theme.Button(self.controls, "Poddaj się", kind="danger",
+                     command=self._resign).pack(fill="x", pady=3)
 
     def _resign(self) -> None:
         if not self.finished:
@@ -497,37 +475,47 @@ class NetworkGameScreen(BaseGameScreen):
 
 class ComputerSetupScreen(tk.Frame):
     def __init__(self, master, app):
-        super().__init__(master)
+        super().__init__(master, bg=theme.BG)
         self.app = app
-        tk.Label(self, text="Gra z komputerem", font=TITLE_FONT, pady=20).pack()
+        inner = _centered_card(self, pad_x=44, pad_y=32)
+
+        theme.title(inner, "Gra z komputerem", size=24).pack(pady=(0, 20))
         self.color_var = tk.StringVar(value=game.WHITE)
         self.elo_var = tk.IntVar(value=game.DEFAULT_ELO)
         self.time_var = tk.DoubleVar(value=1.0)
 
-        color_frame = tk.Frame(self)
-        color_frame.pack(pady=6)
-        tk.Label(color_frame, text="Twój kolor:", font=BUTTON_FONT).pack(side="left", padx=6)
-        tk.Radiobutton(color_frame, text="Białe", variable=self.color_var,
-                       value=game.WHITE, font=BUTTON_FONT).pack(side="left")
-        tk.Radiobutton(color_frame, text="Czarne", variable=self.color_var,
-                       value=game.BLACK, font=BUTTON_FONT).pack(side="left")
+        color_frame = tk.Frame(inner, bg=theme.SURFACE)
+        color_frame.pack(pady=8, anchor="w", fill="x")
+        theme.label(color_frame, "Twój kolor:").pack(side="left", padx=(0, 10))
+        for text, value in (("Białe", game.WHITE), ("Czarne", game.BLACK)):
+            tk.Radiobutton(color_frame, text=text, variable=self.color_var,
+                           value=value, font=theme.ui_font(12),
+                           bg=theme.SURFACE, fg=theme.TEXT,
+                           activebackground=theme.SURFACE, activeforeground=theme.TEXT,
+                           selectcolor=theme.SURFACE_LIGHT).pack(side="left")
 
-        elo_frame = tk.Frame(self)
-        elo_frame.pack(pady=6)
-        tk.Label(elo_frame, text="Siła (ELO):", font=BUTTON_FONT).pack(side="left", padx=6)
-        tk.Scale(elo_frame, from_=1320, to=2850, orient="horizontal", length=260,
-                 variable=self.elo_var).pack(side="left")
+        elo_frame = tk.Frame(inner, bg=theme.SURFACE)
+        elo_frame.pack(pady=8, anchor="w", fill="x")
+        theme.label(elo_frame, "Siła (ELO):").pack(side="left", padx=(0, 10))
+        self._scale(elo_frame, 1320, 2850, 1, self.elo_var).pack(side="left")
 
-        time_frame = tk.Frame(self)
-        time_frame.pack(pady=6)
-        tk.Label(time_frame, text="Czas na ruch (s):", font=BUTTON_FONT).pack(side="left", padx=6)
-        tk.Scale(time_frame, from_=0.1, to=5.0, resolution=0.1, orient="horizontal",
-                 length=260, variable=self.time_var).pack(side="left")
+        time_frame = tk.Frame(inner, bg=theme.SURFACE)
+        time_frame.pack(pady=8, anchor="w", fill="x")
+        theme.label(time_frame, "Czas na ruch (s):").pack(side="left", padx=(0, 10))
+        self._scale(time_frame, 0.1, 5.0, 0.1, self.time_var).pack(side="left")
 
-        tk.Button(self, text="Rozpocznij", font=BUTTON_FONT, width=20,
-                  command=self._start).pack(pady=12)
-        tk.Button(self, text="Powrót", font=("Segoe UI", 11),
-                  command=self.app.show_menu).pack()
+        theme.Button(inner, "Rozpocznij", command=self._start).pack(
+            fill="x", pady=(20, 0))
+        theme.Button(inner, "Powrót", kind="ghost",
+                     command=self.app.show_menu).pack(fill="x", pady=(10, 0))
+
+    @staticmethod
+    def _scale(parent, frm, to, resolution, variable):
+        return tk.Scale(parent, from_=frm, to=to, resolution=resolution,
+                        orient="horizontal", length=240, variable=variable,
+                        bg=theme.SURFACE, fg=theme.TEXT, troughcolor=theme.SURFACE_LIGHT,
+                        highlightthickness=0, activebackground=theme.ACCENT,
+                        font=theme.ui_font(10))
 
     def _start(self) -> None:
         try:
@@ -540,34 +528,48 @@ class ComputerSetupScreen(tk.Frame):
 
 class NetworkSetupScreen(tk.Frame):
     def __init__(self, master, app):
-        super().__init__(master)
+        super().__init__(master, bg=theme.BG)
         self.app = app
-        tk.Label(self, text="Gra w sieci LAN", font=TITLE_FONT, pady=20).pack()
+        inner = _centered_card(self, pad_x=40, pad_y=28)
 
-        host_box = tk.LabelFrame(self, text="Załóż grę (host)", font=BUTTON_FONT, padx=12, pady=12)
-        host_box.pack(fill="x", padx=20, pady=8)
-        tk.Label(host_box, text=f"Twój adres IP: {local_ip_address()}",
-                 font=("Consolas", 12)).pack(anchor="w")
-        tk.Label(host_box, text=f"Port: {protocol.DEFAULT_PORT}",
-                 font=("Consolas", 12)).pack(anchor="w")
-        tk.Button(host_box, text="Uruchom hosta i graj (Białe)", font=BUTTON_FONT,
-                  command=self._host).pack(pady=8)
+        theme.title(inner, "Gra w sieci LAN", size=24).pack(pady=(0, 18))
 
-        join_box = tk.LabelFrame(self, text="Dołącz do gry (klient)", font=BUTTON_FONT, padx=12, pady=12)
-        join_box.pack(fill="x", padx=20, pady=8)
-        row = tk.Frame(join_box)
-        row.pack()
-        tk.Label(row, text="Adres IP hosta:", font=BUTTON_FONT).pack(side="left", padx=4)
+        host_box = tk.Frame(inner, bg=theme.SURFACE_LIGHT,
+                            highlightbackground=theme.BORDER, highlightthickness=1)
+        host_box.pack(fill="x", pady=8)
+        host_inner = tk.Frame(host_box, bg=theme.SURFACE_LIGHT)
+        host_inner.pack(fill="x", padx=14, pady=12)
+        theme.subtitle(host_inner, "Załóż grę (host)", size=12).pack(anchor="w")
+        tk.Label(host_inner, text=f"Twój adres IP: {local_ip_address()}",
+                 font=theme.mono_font(12), bg=theme.SURFACE_LIGHT,
+                 fg=theme.TEXT).pack(anchor="w", pady=(6, 0))
+        tk.Label(host_inner, text=f"Port: {protocol.DEFAULT_PORT}",
+                 font=theme.mono_font(12), bg=theme.SURFACE_LIGHT,
+                 fg=theme.TEXT).pack(anchor="w")
+        theme.Button(host_inner, "Uruchom hosta i graj (Białe)",
+                     command=self._host).pack(fill="x", pady=(10, 0))
+
+        join_box = tk.Frame(inner, bg=theme.SURFACE_LIGHT,
+                            highlightbackground=theme.BORDER, highlightthickness=1)
+        join_box.pack(fill="x", pady=8)
+        join_inner = tk.Frame(join_box, bg=theme.SURFACE_LIGHT)
+        join_inner.pack(fill="x", padx=14, pady=12)
+        theme.subtitle(join_inner, "Dołącz do gry (klient)", size=12).pack(anchor="w")
+        row = tk.Frame(join_inner, bg=theme.SURFACE_LIGHT)
+        row.pack(anchor="w", pady=(6, 0))
+        tk.Label(row, text="Adres IP:", font=theme.ui_font(12),
+                 bg=theme.SURFACE_LIGHT, fg=theme.TEXT).pack(side="left", padx=(0, 6))
         self.ip_var = tk.StringVar(value="127.0.0.1")
-        tk.Entry(row, textvariable=self.ip_var, font=("Consolas", 12), width=16).pack(side="left")
-        tk.Label(row, text="Port:", font=BUTTON_FONT).pack(side="left", padx=4)
+        theme.entry(row, textvariable=self.ip_var, width=16).pack(side="left", ipady=3)
+        tk.Label(row, text="Port:", font=theme.ui_font(12),
+                 bg=theme.SURFACE_LIGHT, fg=theme.TEXT).pack(side="left", padx=6)
         self.port_var = tk.IntVar(value=protocol.DEFAULT_PORT)
-        tk.Entry(row, textvariable=self.port_var, font=("Consolas", 12), width=7).pack(side="left")
-        tk.Button(join_box, text="Połącz i graj (Czarne)", font=BUTTON_FONT,
-                  command=self._join).pack(pady=8)
+        theme.entry(row, textvariable=self.port_var, width=7).pack(side="left", ipady=3)
+        theme.Button(join_inner, "Połącz i graj (Czarne)",
+                     command=self._join).pack(fill="x", pady=(10, 0))
 
-        tk.Button(self, text="Powrót", font=("Segoe UI", 11),
-                  command=self.app.show_menu).pack(pady=8)
+        theme.Button(inner, "Powrót", kind="ghost",
+                     command=self.app.show_menu).pack(fill="x", pady=(14, 0))
 
     def _host(self) -> None:
         server = GameServer(port=protocol.DEFAULT_PORT)
@@ -586,7 +588,18 @@ class NetworkSetupScreen(tk.Frame):
         self.app.show_network_game(client, server)
 
     def _join(self) -> None:
-        client = NetworkClient(self.ip_var.get().strip(), self.port_var.get())
+        host = self.ip_var.get().strip()
+        if not host:
+            messagebox.showwarning("Połączenie", "Podaj adres IP hosta.")
+            return
+        try:
+            port = int(self.port_var.get())
+            if not (1 <= port <= 65535):
+                raise ValueError
+        except (ValueError, tk.TclError):
+            messagebox.showwarning("Połączenie", "Port musi być liczbą 1-65535.")
+            return
+        client = NetworkClient(host, port)
         try:
             client.connect()
         except OSError as error:
@@ -598,66 +611,33 @@ class NetworkSetupScreen(tk.Frame):
 class LoadGameDialog(tk.Toplevel):
     def __init__(self, master, games):
         super().__init__(master)
-
         self.title("Wczytaj grę")
+        self.configure(bg=theme.BG)
         self.resizable(False, False)
-
         self.selected_game = None
 
-        tk.Label(
-            self,
-            text="Wybierz zapisaną grę",
-            font=("Segoe UI", 14, "bold")
-        ).pack(pady=10)
+        theme.title(self, "Wybierz zapisaną grę", size=16).pack(pady=14)
 
-        container = tk.Frame(self)
-        container.pack(padx=10, pady=10)
+        container = tk.Frame(self, bg=theme.BG)
+        container.pack(padx=14, pady=4)
 
         for i, (game_id, date) in enumerate(games):
+            card = tk.Frame(container, bg=theme.SURFACE,
+                            highlightbackground=theme.BORDER, highlightthickness=1)
+            card.grid(row=i // 3, column=i % 3, padx=8, pady=8, sticky="nsew")
+            inner = tk.Frame(card, bg=theme.SURFACE)
+            inner.pack(padx=12, pady=12)
 
-            card = tk.LabelFrame(
-                container,
-                text=f"Gra #{game_id}",
-                padx=10,
-                pady=10
-            )
+            theme.subtitle(inner, f"Gra #{game_id}", size=12).pack()
+            theme.label(inner, str(date), size=10, muted=True).pack(pady=(2, 8))
+            tk.Label(inner, text="♟", font=theme.piece_font(40),
+                     bg=theme.SURFACE_LIGHT, fg=theme.ACCENT, width=4, height=2).pack()
+            theme.Button(inner, "Wybierz", kind="ghost",
+                         command=lambda gid=game_id: self._select(gid)).pack(
+                fill="x", pady=(10, 0))
 
-            row = i // 3
-            column = i % 3
-
-            card.grid(
-                row=row,
-                column=column,
-                padx=8,
-                pady=8,
-                sticky="nsew"
-            )
-
-            tk.Label(
-                card,
-                text=date,
-                font=("Segoe UI", 10)
-            ).pack(pady=(0, 8))
-
-            tk.Label(
-                card,
-                text="♟\nMiniatura\n(szachownica)",
-                width=18,
-                height=6,
-                relief="solid"
-            ).pack()
-
-            tk.Button(
-                card,
-                text="Wybierz",
-                command=lambda id=game_id: self._select(id)
-            ).pack(fill="x", pady=(8, 0))
-
-        tk.Button(
-            self,
-            text="Anuluj",
-            command=self.destroy
-        ).pack(pady=(0, 10))
+        theme.Button(self, "Anuluj", kind="ghost",
+                     command=self.destroy).pack(pady=(6, 14))
 
     def _select(self, game_id):
         self.selected_game = game_id
