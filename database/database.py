@@ -1,10 +1,22 @@
 import sqlite3
 from pathlib import Path
+import platform
+import os
 
-BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "database" / "database.sqlite"
+USE_APPDATA_DB = True
 
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+if(USE_APPDATA_DB):
+    if platform.system() == "Windows":
+        APP_DIR = Path(os.environ["LOCALAPPDATA"]) / "Szachy"
+    else:
+        APP_DIR = Path.home() / ".szachy"
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    DB_PATH = APP_DIR / "database.sqlite"
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+    DB_PATH = BASE_DIR / "database" / "database.sqlite"
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 CREATE_USERS_TABLE = """
 CREATE TABLE IF NOT EXISTS Users (
