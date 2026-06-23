@@ -3,7 +3,7 @@ import platform
 from pathlib import Path
 from typing import Literal
 from io import StringIO
-
+import subprocess
 
 try:
     from typing import override
@@ -51,7 +51,7 @@ _PIECE_LETTERS: dict[int, PieceType] = {
 }
 
 
-def to_piece_type(piece: chess.Piece) -> PieceType:
+def _to_piece_type(piece: chess.Piece) -> PieceType:
     return _PIECE_LETTERS[piece.piece_type]
 
 
@@ -118,7 +118,7 @@ class ComputerMoveProvider(MoveProvider):
                 "Stockfish not found in gameplay/game_logic/stockfish or on PATH.")
         self.elo = elo_strength
         self.time_to_think_in_sec = time_to_think_in_sec
-        self.engine = chess.engine.SimpleEngine.popen_uci(engine_path)
+        self.engine = chess.engine.SimpleEngine.popen_uci(engine_path, creationflags=subprocess.CREATE_NO_WINDOW,)
         self.engine.configure({
             "UCI_LimitStrength": True,
             "UCI_Elo": elo_strength,
@@ -199,13 +199,13 @@ class Game:
             return None
         return self._board.move_stack[-1].uci()
 
-    def _is_automatic_move(self) -> bool:
+    def is_automatic_move(self) -> bool:
         return self.actual_move_provider.is_automatic()
 
-    def _compute_automatic_move(self) -> str:
+    def compute_automatic_move(self) -> str:
         return self.actual_move_provider.compute_move(self._board)
 
-    def _execute_automatic_move(self) -> str:
+    def execute_automatic_move(self) -> str:
         move = self.actual_move_provider.pop_move()
         assert self.make_move(move)
         return move
@@ -216,7 +216,7 @@ class Game:
             piece = self._board.piece_at(square)
             if piece is not None:
                 result[chess.square_name(square)] = (
-                    to_piece_type(piece), to_color(piece.color))
+                    _to_piece_type(piece), to_color(piece.color))
         return result
 
     def status(self) -> str:
