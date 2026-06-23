@@ -1,13 +1,8 @@
 import sqlite3
 from pathlib import Path
 
-import os
-
-#    datas=[("../gameplay/game_logic/stockfish-windows-x86-64-avx2.exe", "gameplay/game_logic")],
-
-
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "database" /"database.sqlite"
+DB_PATH = BASE_DIR / "database" / "database.sqlite"
 
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -33,16 +28,19 @@ CREATE TABLE IF NOT EXISTS Games (
 );
 """
 
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
 
 def init_database() -> None:
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
+    with _connect() as conn:
         conn.execute(CREATE_USERS_TABLE)
         conn.execute(CREATE_GAMES_TABLE)
         conn.commit()
 
 def create_user(username: str, password_hash: str) -> None:
-    with sqlite3.connect(DB_PATH) as conn:
+    with _connect() as conn:
         conn.execute(
             """
             INSERT INTO Users(username, password_hash)
@@ -51,8 +49,9 @@ def create_user(username: str, password_hash: str) -> None:
             (username, password_hash)
         )
 
-def get_user(username: str):
-    with sqlite3.connect(DB_PATH) as conn:
+def get_user(username: str) -> tuple | None:
+    """Return the user's ID, username, password hash and creation date, or None if the user does not exist."""
+    with _connect() as conn:
         return conn.execute(
             """
             SELECT *
@@ -63,7 +62,8 @@ def get_user(username: str):
         ).fetchone()
 
 def load_game(game_id: int) -> str | None:
-    with sqlite3.connect(DB_PATH) as conn:
+    """Return the PGN of the specified game, or None if it does not exist."""    
+    with _connect() as conn:
         row = conn.execute(
             """
             SELECT pgn
@@ -76,8 +76,9 @@ def load_game(game_id: int) -> str | None:
     return row[0] if row else None
 
 
-def load_all_games(owner_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
+def load_all_games(owner_id: int)  -> list[tuple]:
+    """Return a list of (game_id, creation_date) tuples for the specified user."""
+    with _connect() as conn:
         return conn.execute(
             """
             SELECT id, created_at
@@ -88,8 +89,8 @@ def load_all_games(owner_id: int):
             (owner_id,)
         ).fetchall()
 
-def save_game(user_id:int, pgn: str):
-    with sqlite3.connect(DB_PATH) as conn:
+def save_game(user_id:int, pgn: str) -> None:
+    with _connect() as conn:
         conn.execute(
             """
             INSERT INTO Games(owner_id, pgn)
