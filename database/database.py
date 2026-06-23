@@ -36,7 +36,6 @@ def init_database() -> None:
         conn.commit()
 
 def create_user(username: str, password_hash: str) -> None:
-    """    Creates a new user in the database.  """
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
@@ -47,7 +46,6 @@ def create_user(username: str, password_hash: str) -> None:
         )
 
 def get_user(username: str):
-    """Returns the user with the given username or None if it does not exist."""
     with sqlite3.connect(DB_PATH) as conn:
         return conn.execute(
             """
@@ -59,7 +57,6 @@ def get_user(username: str):
         ).fetchone()
 
 def load_game(game_id: int) -> str | None:
-    """Returns the PGN of the selected game."""
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(
             """
@@ -74,7 +71,6 @@ def load_game(game_id: int) -> str | None:
 
 
 def load_all_games(owner_id: int):
-    """Returns all games belonging to the specified user."""
     with sqlite3.connect(DB_PATH) as conn:
         return conn.execute(
             """
@@ -87,7 +83,6 @@ def load_all_games(owner_id: int):
         ).fetchall()
 
 def save_game(user_id:int, pgn: str):
-    """Saves a game in PGN format for the specified user."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
@@ -99,4 +94,3 @@ def save_game(user_id:int, pgn: str):
 
 if __name__ == "__main__":
     init_database()
-

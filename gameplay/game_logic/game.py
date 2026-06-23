@@ -1,10 +1,17 @@
 import os
 import platform
 from pathlib import Path
-from typing import Literal, override
-from database import database
+from typing import Literal
 from io import StringIO
 
+
+try:
+    from typing import override
+except ImportError:
+    def override(func):
+        return func
+
+from database import database
 
 import chess
 import chess.engine
@@ -26,11 +33,12 @@ DRAW_STATUS = "draw"
 
 DEFAULT_ELO = 1320
 
-type PieceType = Literal["P", "N", "B", "R", "Q", "K"]
-type Color = Literal["white", "black"]
-type Square = str
-type PieceDisplay = tuple[PieceType, Color]
-type BoardFormat = dict[Square, PieceDisplay]
+
+PieceType = Literal["P", "N", "B", "R", "Q", "K"]
+Color = Literal["white", "black"]
+Square = str
+PieceDisplay = tuple[PieceType, Color]
+BoardFormat = dict[Square, PieceDisplay]
 
 
 _PIECE_LETTERS: dict[int, PieceType] = {
@@ -148,7 +156,8 @@ class ComputerMoveProvider(MoveProvider):
 
 
 class Game:
-    def __init__(self, user_id: int, white_provider: MoveProvider | None = None,
+    def __init__(self, user_id: int | None = None,
+                 white_provider: MoveProvider | None = None,
                  black_provider: MoveProvider | None = None):
         self.user_id = user_id
         self.move_white_provider = white_provider or HumanMoveProvider()
@@ -274,7 +283,7 @@ class Game:
 
     def load_all_games(self):
         return database.load_all_games(self.user_id)
-    
+
     def to_pgn(self) -> str:
         game = chess.pgn.Game()
         node: chess.pgn.GameNode = game
@@ -284,6 +293,8 @@ class Game:
         return str(game)
 
     def save_game(self) -> None:
+        if self.user_id is None:
+            raise ValueError("Zapis wymaga zalogowanego użytkownika.")
         database.save_game(self.user_id, self.to_pgn())
 
     def load_game(self, game_id: int) -> None:
@@ -297,11 +308,13 @@ class Game:
     def save_pgn(self, path: str) -> None:
         Path(path).write_text(self.to_pgn(), encoding="utf-8")
 
-    def load_pgn(self, pgn: str) -> None:
-        parsed = chess.pgn.read_game(StringIO(pgn))
-
+    def load_pgn(self, source: str) -> None:
+        text = source
+        if os.path.exists(source):
+            text = Path(source).read_text(encoding="utf-8")
+        parsed = chess.pgn.read_game(StringIO(text))
         if parsed is None:
-            raise ValueError("No game found in PGN file.")
+            raise ValueError("Brak partii w danych PGN.")
         self._board = parsed.board()
         self._san_history = []
         for move in parsed.mainline_moves():
