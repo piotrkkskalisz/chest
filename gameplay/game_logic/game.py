@@ -302,12 +302,12 @@ class Game:
         
     def save_game(self) -> int:
         if self.user_id is None:
-            raise ValueError("Zapis wymaga zalogowanego użytkownika.")
+            raise ValueError("Write requires log in user.")
         return database.save_game(self.user_id, self.to_pgn())
 
     def load_game(self, game_id: int) -> None:
         if self.user_id is None:
-            raise ValueError("Ładowanie wymaga zalogowanego użytkownika.")
+            raise ValueError("Load requires log in user.")
         pgn = database.load_game(self.user_id, game_id)
         if pgn is None:
             raise ValueError("Game not found.")
@@ -318,7 +318,7 @@ class Game:
         """Load a game from a PGN string."""
         parsed = chess.pgn.read_game(StringIO(pgn))
         if parsed is None:
-            raise ValueError("Brak partii w danych PGN.")
+            raise ValueError("Invalid PGN.")
         self._board = parsed.board()
         self._san_history = []
         for move in parsed.mainline_moves():
