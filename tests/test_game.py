@@ -1,9 +1,11 @@
 import sys
 from pathlib import Path
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from gameplay.game_logic import game
+from database import database
 
 
 def test_initial_state():
@@ -67,13 +69,48 @@ def test_castling_available():
     assert display["g1"] == ("K", game.WHITE)
     assert display["f1"] == ("R", game.WHITE)
 
+def create_user_game_with_save(username: str = "user1", moves: tuple[tuple[str, str], ...]= (("e2", "e4"), ("e7", "e5"))) -> tuple[int, int]:
+    password_hash = "fake_hash"
+    user_id = database.create_user(username, password_hash)
+    chess_game = game.Game(user_id = user_id)
 
-def test_pgn_round_trip(tmp_path):
-    chess_game = game.Game()
-    chess_game.make_move_between("e2", "e4")
-    chess_game.make_move_between("e7", "e5")
-    path = tmp_path / "game.pgn"
-    chess_game.save_pgn(str(path))
-    loaded = game.Game()
-    loaded.load_pgn(str(path))
+    for move in moves:
+        chess_game.make_move_between(*move)
+    
+    game_saves_id = chess_game.save_game()
+    return user_id, game_saves_id
+
+
+def test_load_saved_game(temp_db):
+    user_id, game_id = create_user_game_with_save()
+    loaded = game.Game(user_id = user_id)
+    loaded.load_game(game_id)
     assert loaded.move_history == ["e4", "e5"]
+
+
+def test_load_requires_logged_user(temp_db):
+    _, game_id = create_user_game_with_save()
+    with pytest.raises(ValueError):
+        new_game = game.Game()
+        new_game.load_game(game_id)
+
+
+def test_cannot_load_game_without_save(temp_db):
+    non_existing_game_id  = 1
+    user_id = database.create_user("u2", "fake_hash")
+
+    with pytest.raises(ValueError):
+        new_game = game.Game(user_id = user_id)
+        new_game.load_game(non_existing_game_id )
+
+def test_users_cannot_load_each_other_games(temp_db):
+    user1_id, game1_id = create_user_game_with_save()
+    user2_id, game2_id = create_user_game_with_save("user2", (("a2", "a3"), ("a7", "a5"), ("a3", "a4")))
+
+    with pytest.raises(ValueError):
+        new_game = game.Game(user_id = user1_id)
+        new_game.load_game(game2_id)
+        
+    with pytest.raises(ValueError):
+        new_game = game.Game(user_id = user2_id)
+        new_game.load_game(game1_id)
