@@ -16,7 +16,8 @@ ENGINE_POLL_MS = 100
 NETWORK_POLL_MS = 100
 
 
-def status_text(status: str, turn: str, winner: str | None) -> str:
+def status_text(status: str, turn: game.Color, winner: str | None) -> str:
+    """Return a user-friendly description of the current game status."""
     if status == game.CHECKMATE_STATUS:
         champion = winner or game.opposite(turn)
         return f"Szach-mat! Wygrywają {COLOR_NAMES[champion]}."
@@ -53,6 +54,7 @@ class LoginScreen(tk.Frame):
         theme.label(inner, "Hasło:").pack(anchor="w")
         self.password_entry = theme.entry(inner, show="*", width=26)
         self.password_entry.pack(pady=(2, 18), ipady=4)
+
         self.password_entry.bind("<Return>", lambda _e: self.login())
 
         theme.Button(inner, "Zaloguj", command=self.login).pack(fill="x")
@@ -177,6 +179,7 @@ class BaseGameScreen(tk.Frame):
         self._build_side_panel(title)
 
     def _build_side_panel(self, title: str) -> None:
+        """Create the side panel with move history and controls."""
         panel = tk.Frame(self, bg=theme.SURFACE, highlightbackground=theme.BORDER,
                          highlightthickness=1)
         panel.grid(row=1, column=1, sticky="ns", padx=(0, 16), pady=16)
@@ -205,9 +208,11 @@ class BaseGameScreen(tk.Frame):
                      command=self.app.show_menu).pack(fill="x", pady=(8, 0))
 
     def handle_user_move(self, origin: str, target: str, promotion: str | None) -> None:
+        """Handle a move selected by the user."""
         raise NotImplementedError
 
     def refresh_history(self, history: list[str]) -> None:
+        """Update the displayed move history."""
         self.history_list.delete(0, tk.END)
         for index in range(0, len(history), 2):
             number = index // 2 + 1
@@ -511,6 +516,7 @@ class ComputerSetupScreen(tk.Frame):
 
     @staticmethod
     def _scale(parent, frm, to, resolution, variable):
+        """Create a styled horizontal slider."""
         return tk.Scale(parent, from_=frm, to=to, resolution=resolution,
                         orient="horizontal", length=240, variable=variable,
                         bg=theme.SURFACE, fg=theme.TEXT, troughcolor=theme.SURFACE_LIGHT,
@@ -518,6 +524,7 @@ class ComputerSetupScreen(tk.Frame):
                         font=theme.ui_font(10))
 
     def _start(self) -> None:
+        """Start a new game using the selected settings."""
         try:
             provider = game.ComputerMoveProvider(self.elo_var.get(), self.time_var.get())
         except game.EngineNotFoundError as error:
@@ -614,7 +621,7 @@ class LoadGameDialog(tk.Toplevel):
         self.title("Wczytaj grę")
         self.configure(bg=theme.BG)
         self.resizable(False, False)
-        self.selected_game = None
+        self.selected_game: int | None = None
 
         theme.title(self, "Wybierz zapisaną grę", size=16).pack(pady=14)
 
