@@ -2,7 +2,7 @@ import tkinter as tk
 
 from . import screens
 from . import theme
-
+from collections.abc import Callable
 
 SCREEN_FRACTION = 0.82
 MIN_WIDTH = 900
@@ -16,10 +16,10 @@ class ChessApp:
         theme.init(root)
         self._configure_window()
 
-        self.container = tk.Frame(root, bg=theme.BG)
-        self.container.pack(fill="both", expand=True)
+        self._container:  tk.Frame = tk.Frame(root, bg=theme.BG)
+        self._container.pack(fill="both", expand=True)
         self._current: tk.Frame | None = None
-        self.user_id = None
+        self.user_id: int | None = None
         self.show_login()
 
     def _configure_window(self) -> None:
@@ -34,16 +34,22 @@ class ChessApp:
         self.root.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
         self.root.minsize(min(MIN_WIDTH, screen_w), min(MIN_HEIGHT, screen_h))
 
-    def _switch(self, factory) -> None:
+    def _cleanup_current(self) -> None:
+        if self._current is None:
+            return
+        cleanup = getattr(self._current, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
+
+    def _switch(self, factory: Callable[[tk.Frame, "ChessApp"], tk.Frame]) -> None:
+        self._cleanup_current()
         if self._current is not None:
-            cleanup = getattr(self._current, "cleanup", None)
-            if callable(cleanup):
-                cleanup()
             self._current.destroy()
-        self._current = factory(self.container, self)
+
+        self._current = factory(self._container, self)
         self._current.pack(fill="both", expand=True)
 
-    def set_user(self, user_id) -> None:
+    def set_user(self, user_id: int | None) -> None:
         self.user_id = user_id
 
     def show_login(self) -> None:
@@ -73,10 +79,7 @@ class ChessApp:
             master, app, client, server))
 
     def quit_app(self) -> None:
-        if self._current is not None:
-            cleanup = getattr(self._current, "cleanup", None)
-            if callable(cleanup):
-                cleanup()
+        self._cleanup_current()
         self.root.destroy()
 
 

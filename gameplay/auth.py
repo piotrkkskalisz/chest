@@ -1,25 +1,23 @@
 from database.database import create_user, get_user
-
-
-def _clean(username: str) -> str:
-    return (username or "").strip()
-
+import bcrypt
 
 def register(username: str, password: str) -> int | None:
-    username = _clean(username)
+    """Create a new user and return their ID, if something go wrong return None"""
+    username = username.strip()
     if not username or not password:
         return None
     if get_user(username) is not None:
         return None
 
-    password_hash = password
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     create_user(username, password_hash)
     user = get_user(username)
     return user[0] if user else None
 
 
 def login(username: str, password: str) -> int | None:
-    username = _clean(username)
+    """Return the user's ID if the credentials are valid."""
+    username = username.strip()
     if not username or not password:
         return None
 
@@ -28,6 +26,6 @@ def login(username: str, password: str) -> int | None:
         return None
 
     password_hash = user[2]
-    if password_hash == password:
+    if bcrypt.checkpw(password.encode(), password_hash.encode()):
         return user[0]
     return None

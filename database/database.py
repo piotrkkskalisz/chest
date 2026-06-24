@@ -1,15 +1,22 @@
 import sqlite3
 from pathlib import Path
-
+import platform
 import os
 
-#    datas=[("../gameplay/game_logic/stockfish-windows-x86-64-avx2.exe", "gameplay/game_logic")],
+USE_APPDATA_DB = True
 
-APP_DIR = Path(os.getenv("LOCALAPPDATA")) / "Szachy"
-APP_DIR.mkdir(parents=True, exist_ok=True)
+if(USE_APPDATA_DB):
+    if platform.system() == "Windows":
+        APP_DIR = Path(os.environ["LOCALAPPDATA"]) / "Szachy"
+    else:
+        APP_DIR = Path.home() / ".szachy"
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    DB_PATH = APP_DIR / "database.sqlite"
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+    DB_PATH = BASE_DIR / "database" / "database.sqlite"
 
-DB_PATH = APP_DIR / "database.sqlite"
-
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 CREATE_USERS_TABLE = """
 CREATE TABLE IF NOT EXISTS Users (
@@ -33,26 +40,32 @@ CREATE TABLE IF NOT EXISTS Games (
 );
 """
 
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
 
 def init_database() -> None:
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("PRAGMA foreign_keys = ON;")
+    with _connect() as conn:
         conn.execute(CREATE_USERS_TABLE)
         conn.execute(CREATE_GAMES_TABLE)
         conn.commit()
 
-def create_user(username: str, password_hash: str) -> None:
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
+def create_user(username: str, password_hash: str) -> int:
+    with _connect() as conn:
+        cursor = conn.execute(
             """
             INSERT INTO Users(username, password_hash)
             VALUES (?, ?);
             """,
             (username, password_hash)
         )
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
 
-def get_user(username: str):
-    with sqlite3.connect(DB_PATH) as conn:
+def get_user(username: str) -> tuple | None:
+    """Return the user's ID, username, password hash and creation date, or None if the user does not exist."""
+    with _connect() as conn:
         return conn.execute(
             """
             SELECT *
@@ -62,22 +75,24 @@ def get_user(username: str):
             (username,)
         ).fetchone()
 
-def load_game(game_id: int) -> str | None:
-    with sqlite3.connect(DB_PATH) as conn:
+def load_game(user_id: int, game_id: int) -> str | None:
+    """Return the PGN of the specified game, or None if it does not exist or does not belong to the user."""
+    with _connect() as conn:
         row = conn.execute(
             """
             SELECT pgn
             FROM Games
-            WHERE id = ?;
+            WHERE id = ? AND owner_id = ?;
             """,
-            (game_id,)
+            (game_id, user_id)
         ).fetchone()
 
     return row[0] if row else None
 
 
-def load_all_games(owner_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
+def load_all_games(owner_id: int)  -> list[tuple]:
+    """Return a list of (game_id, creation_date) tuples for the specified user."""
+    with _connect() as conn:
         return conn.execute(
             """
             SELECT id, created_at
@@ -88,15 +103,17 @@ def load_all_games(owner_id: int):
             (owner_id,)
         ).fetchall()
 
-def save_game(user_id:int, pgn: str):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
+def save_game(user_id:int, pgn: str) -> int:
+    with _connect() as conn:
+        cursor = conn.execute(
             """
             INSERT INTO Games(owner_id, pgn)
             VALUES (?, ?);
             """,
             (user_id, pgn)
         )
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
 
 if __name__ == "__main__":
     init_database()

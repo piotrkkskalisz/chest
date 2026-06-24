@@ -65,7 +65,6 @@ class BoardView(tk.Frame):
         else:
             self._last_move = None
 
-
     def _on_resize(self, event: tk.Event) -> None:
         usable = min(event.width, event.height)
         square = max(MIN_SQUARE, min(MAX_SQUARE, usable // game.BOARD_SIZE))
@@ -77,6 +76,7 @@ class BoardView(tk.Frame):
 
 
     def _cell_to_square(self, row: int, col: int) -> str:
+        """Convert board coordinates to chess square notation."""
         if self._orientation == game.WHITE:
             file_index = col
             rank_index = game.BOARD_SIZE - 1 - row
@@ -86,12 +86,12 @@ class BoardView(tk.Frame):
         return chess.square_name(chess.square(file_index, rank_index))
 
     def _pixel_to_cell(self, x: int, y: int) -> tuple[int, int] | None:
+        """Convert canvas coordinates to board coordinates."""
         col = (x - self._origin_x) // self._square
         row = (y - self._origin_y) // self._square
         if 0 <= row < game.BOARD_SIZE and 0 <= col < game.BOARD_SIZE:
             return int(row), int(col)
         return None
-
 
     def _on_click(self, event: tk.Event) -> None:
         if not self._enabled:
@@ -128,6 +128,7 @@ class BoardView(tk.Frame):
             self._on_move(origin, square, promotion)
 
     def _legal_from(self, square: str) -> list[str]:
+        """Return all legal destination squares from the given square."""
         start = chess.parse_square(square)
         return [chess.square_name(move.to_square)
                 for move in self._board.legal_moves
@@ -139,6 +140,7 @@ class BoardView(tk.Frame):
 
 
     def _maybe_promotion(self, origin: str, target: str) -> str | None:
+        """Ask the user for a promotion piece if needed."""
         piece = self._board.piece_at(chess.parse_square(origin))
         if piece is None or piece.piece_type != chess.PAWN:
             return None
@@ -147,6 +149,7 @@ class BoardView(tk.Frame):
         return self._ask_promotion()
 
     def _ask_promotion(self) -> str:
+        """Show the promotion dialog and return the selected piece."""
         dialog = tk.Toplevel(self)
         dialog.title("Promocja pionka")
         dialog.configure(bg=theme.SURFACE)
@@ -173,6 +176,7 @@ class BoardView(tk.Frame):
 
 
     def refresh(self) -> None:
+        """Redraw the entire chessboard."""
         self.canvas.delete("all")
         check_square = None
         if self._board.is_check():
@@ -227,6 +231,7 @@ class BoardView(tk.Frame):
                     self._draw_piece(cx, cy, piece, glyph_font)
 
     def _draw_target(self, cx: float, cy: float, size: int, occupied: bool) -> None:
+        """Draw a marker for a legal destination square."""
         if occupied:
             r = size * 0.46
             self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r,

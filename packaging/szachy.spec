@@ -1,12 +1,16 @@
 from PyInstaller.building.datastruct import Tree
-
+from pathlib import Path
+from glob import glob
 block_cipher = None
 
 a = Analysis(
     ['../main.py'],
     pathex=['.'],
     binaries=[],
-    datas=[("../gameplay/game_logic/stockfish/stockfish-windows-x86-64-avx2.exe", "gameplay/game_logic/stockfish")],
+    datas = [
+        (str(Path(file).resolve()), "gameplay/game_logic/stockfish")
+        for file in glob("gameplay/game_logic/stockfish/*")
+    ],
     hiddenimports=['chess', 'chess.engine', 'chess.pgn'],
     hookspath=[],
     runtime_hooks=[],

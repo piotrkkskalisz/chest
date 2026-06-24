@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import font as tkfont
+from collections.abc import Callable
 
 
 BG = "#2e2722"
@@ -13,7 +14,7 @@ ACCENT = "#c19a6b"
 ACCENT_HOVER = "#d4ad7c"
 ACCENT_DARK = "#a87f53"
 DANGER = "#b5544a"
-DANGER_HOVER = "#c76558"
+DANGER_HOVER = "#000000"
 
 TEXT = "#f2e8dc"
 TEXT_MUTED = "#c2b2a0"
@@ -114,13 +115,13 @@ def entry(master: tk.Misc, **kwargs) -> tk.Entry:
 
 class Button(tk.Button):
 
-    _PALETTES = {
+    _PALETTES: dict[str, tuple[str, str, str, str]] = {
         "primary": (ACCENT, ACCENT_HOVER, ACCENT_DARK, TEXT_ON_ACCENT),
         "ghost": (SURFACE_LIGHT, BORDER, ACCENT_DARK, TEXT),
         "danger": (DANGER, DANGER_HOVER, ACCENT_DARK, TEXT),
     }
 
-    def __init__(self, master: tk.Misc, text: str, command=None,
+    def __init__(self, master: tk.Misc, text: str, command: Callable[[], None] = lambda: None,
                  kind: str = "primary", **kwargs):
         base, hover, active, fg = self._PALETTES.get(kind, self._PALETTES["primary"])
         self._base = base

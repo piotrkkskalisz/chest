@@ -3,7 +3,7 @@ import platform
 from pathlib import Path
 from typing import Literal
 from io import StringIO
-
+import subprocess
 
 try:
     from typing import override
@@ -51,7 +51,7 @@ _PIECE_LETTERS: dict[int, PieceType] = {
 }
 
 
-def to_piece_type(piece: chess.Piece) -> PieceType:
+def _to_piece_type(piece: chess.Piece) -> PieceType:
     return _PIECE_LETTERS[piece.piece_type]
 
 
@@ -62,8 +62,8 @@ def to_color(color_bool: bool) -> Color:
 def opposite(color: Color) -> Color:
     return BLACK if color == WHITE else WHITE
 
-
 def find_stockfish() -> str | None:
+    """Return the path to the Stockfish executable or None if it cannot be found."""
     here = Path(__file__).resolve().parent / "stockfish"
     candidates: list[Path] = []
     if here.is_dir():
@@ -86,7 +86,6 @@ def find_stockfish() -> str | None:
 
 class EngineNotFoundError(RuntimeError):
     pass
-
 
 class MoveProvider:
     def is_automatic(self) -> bool:
@@ -113,13 +112,13 @@ class ComputerMoveProvider(MoveProvider):
     def __init__(self, elo_strength: int = DEFAULT_ELO,
                  time_to_think_in_sec: float = 1.0,
                  engine_path: str | None = None):
-        path = engine_path or find_stockfish()
-        if path is None:
+        engine_path = engine_path or find_stockfish()
+        if engine_path is None:
             raise EngineNotFoundError(
                 "Stockfish not found in gameplay/game_logic/stockfish or on PATH.")
         self.elo = elo_strength
         self.time_to_think_in_sec = time_to_think_in_sec
-        self.engine = chess.engine.SimpleEngine.popen_uci(path)
+        self.engine = chess.engine.SimpleEngine.popen_uci(engine_path, creationflags=subprocess.CREATE_NO_WINDOW,)
         self.engine.configure({
             "UCI_LimitStrength": True,
             "UCI_Elo": elo_strength,
@@ -132,6 +131,7 @@ class ComputerMoveProvider(MoveProvider):
 
     @override
     def compute_move(self, board: chess.Board) -> str:
+        """create next move but not execute it, only remmber and return"""
         limit = chess.engine.Limit(time=self.time_to_think_in_sec)
         result = self.engine.play(board, limit)
         assert result.move is not None
@@ -140,6 +140,7 @@ class ComputerMoveProvider(MoveProvider):
 
     @override
     def pop_move(self) -> str:
+        """Return the prepared move and clear it."""
         move = self.get_move()
         self.next_move = None
         return move
@@ -160,13 +161,14 @@ class Game:
                  white_provider: MoveProvider | None = None,
                  black_provider: MoveProvider | None = None):
         self.user_id = user_id
-        self.move_white_provider = white_provider or HumanMoveProvider()
-        self.move_black_provider = black_provider or HumanMoveProvider()
+        self._move_white_provider = white_provider or HumanMoveProvider()
+        self._move_black_provider = black_provider or HumanMoveProvider()
         self._board = chess.Board()
         self._san_history: list[str] = []
 
     @classmethod
     def move_to_positions(cls, move: str) -> tuple[str, str]:
+        """Split a UCI move into source and destination squares."""
         return move[:SQUARE_CODE_SIZE], move[SQUARE_CODE_SIZE:2 * SQUARE_CODE_SIZE]
 
     @property
@@ -184,8 +186,8 @@ class Game:
     @property
     def actual_move_provider(self) -> MoveProvider:
         if self.current_player == WHITE:
-            return self.move_white_provider
-        return self.move_black_provider
+            return self._move_white_provider
+        return self._move_black_provider
 
     @property
     def move_history(self) -> list[str]:
@@ -214,7 +216,7 @@ class Game:
             piece = self._board.piece_at(square)
             if piece is not None:
                 result[chess.square_name(square)] = (
-                    to_piece_type(piece), to_color(piece.color))
+                    _to_piece_type(piece), to_color(piece.color))
         return result
 
     def status(self) -> str:
@@ -247,6 +249,7 @@ class Game:
         return targets
 
     def needs_promotion(self, position_start: Square, position_end: Square) -> bool:
+        """if this move leads to promotion"""
         start = chess.parse_square(position_start)
         end = chess.parse_square(position_end)
         piece = self._board.piece_at(start)
@@ -274,6 +277,7 @@ class Game:
         return True
 
     def load_fen(self, fen: str) -> None:
+        """Load the board from a FEN string."""
         self._board.set_fen(fen)
         self._san_history = []
 
@@ -281,38 +285,38 @@ class Game:
         self._board.reset()
         self._san_history = []
 
-    def load_all_games(self):
+    def load_all_games(self) -> list[tuple]:
+        """Return a list of the user's saved games."""
+        if self.user_id is None:
+            return []
         return database.load_all_games(self.user_id)
 
     def to_pgn(self) -> str:
+        """Return the current game in PGN format."""
         game = chess.pgn.Game()
         node: chess.pgn.GameNode = game
         for move in self._board.move_stack:
             node = node.add_variation(move)
         game.headers["Result"] = self._board.result()
         return str(game)
-
-    def save_game(self) -> None:
+        
+    def save_game(self) -> int:
         if self.user_id is None:
             raise ValueError("Zapis wymaga zalogowanego użytkownika.")
-        database.save_game(self.user_id, self.to_pgn())
+        return database.save_game(self.user_id, self.to_pgn())
 
     def load_game(self, game_id: int) -> None:
-        pgn = database.load_game(game_id)
+        if self.user_id is None:
+            raise ValueError("Ładowanie wymaga zalogowanego użytkownika.")
+        pgn = database.load_game(self.user_id, game_id)
         if pgn is None:
             raise ValueError("Game not found.")
 
         self.load_pgn(pgn)
 
-
-    def save_pgn(self, path: str) -> None:
-        Path(path).write_text(self.to_pgn(), encoding="utf-8")
-
-    def load_pgn(self, source: str) -> None:
-        text = source
-        if os.path.exists(source):
-            text = Path(source).read_text(encoding="utf-8")
-        parsed = chess.pgn.read_game(StringIO(text))
+    def load_pgn(self, pgn: str) -> None:
+        """Load a game from a PGN string."""
+        parsed = chess.pgn.read_game(StringIO(pgn))
         if parsed is None:
             raise ValueError("Brak partii w danych PGN.")
         self._board = parsed.board()
@@ -323,5 +327,5 @@ class Game:
             self._san_history.append(san)
 
     def close(self) -> None:
-        self.move_white_provider.close()
-        self.move_black_provider.close()
+        self._move_white_provider.close()
+        self._move_black_provider.close()
