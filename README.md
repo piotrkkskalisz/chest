@@ -113,6 +113,3 @@ Gotowa aplikacja pojawi sie w katalogu `dist/Szachy/`.
    "Polacz i graj (Czarne)".
 3. Obie osoby musza znajdowac sie w tej samej sieci lokalnej. Na hoscie moze byc
    konieczne zezwolenie Pythonowi na polaczenia przychodzace w zaporze sieciowej.
-
-Pelny opis dzialania znajduje sie w `docs/documentation.html`, a szczegolowe
-objasnienie skladni i logiki kazdego pliku - w `docs/objasnienie_kodu.html`.
