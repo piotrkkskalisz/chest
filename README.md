@@ -2,9 +2,9 @@
 
 Aplikacja szachowa w Pythonie z graficznym interfejsem opartym na `tkinter`.
 Tryby gry: dwie osoby lokalnie (hot-seat), gra z komputerem (Stockfish) oraz
-gra dwoch osob w sieci lokalnej (LAN) w architekturze host-klient.
+gra dwóch osob w sieci lokalnej (LAN) w architekturze host-klient.
 
-Figury rysowane sa symbolami Unicode na plotnie (`tkinter.Canvas`), wiec
+Figury są wyświetlane jako symbole Unicode na plotnie (`tkinter.Canvas`), wiec
 aplikacja nie wymaga zadnych grafik, a plansza skaluje sie do rozmiaru okna.
 
 ## Funkcje
@@ -12,7 +12,7 @@ aplikacja nie wymaga zadnych grafik, a plansza skaluje sie do rozmiaru okna.
 - Pelne reguly szachowe (legalne ruchy, szach, mat, pat, remis, roszada,
   en passant, promocja pionka) dzieki bibliotece `python-chess`.
 - Logowanie i rejestracja uzytkownikow (konta w bazie SQLite).
-- Gra lokalna dwoch osob na jednym komputerze.
+- Gra lokalna dwóch osob na jednym komputerze.
 - Gra z komputerem (Stockfish) z regulacja sily (ELO) i czasu na ruch.
 - Gra w sieci LAN (TCP + JSON) - host zaklada serwer, klient dolacza po IP.
 - Historia ruchow w notacji SAN, podswietlanie pol, ostatniego ruchu i szacha.
@@ -23,7 +23,7 @@ aplikacja nie wymaga zadnych grafik, a plansza skaluje sie do rozmiaru okna.
 ## Struktura projektu
 
 ```
-chest/
+chest/  
 ├── main.py                       # punkt wejscia - inicjuje baze i uruchamia GUI
 ├── requirements.txt              # zaleznosci uruchomieniowe
 ├── requirements-dev.txt          # zaleznosci deweloperskie (testy, pakowanie)
@@ -34,7 +34,6 @@ chest/
 ├── docs/
 │   └── documentation.html        # pelna dokumentacja techniczna
 ├── assets/                       # zasoby (puste - figury sa tekstowe)
-├── saves/                        # zapisane partie PGN
 ├── database/
 │   ├── database.py               # warstwa dostepu do SQLite (uzytkownicy, gry)
 │   └── database.sqlite           # plik bazy danych (tworzony automatycznie)
@@ -59,6 +58,7 @@ chest/
 
 - Python 3.10 lub nowszy
 - biblioteka `python-chess`
+- `bcrypt` 
 - `tkinter` (zwykle dostepny w instalacji Pythona; na Linuksie:
   `sudo apt install python3-tk`)
 - Stockfish - tylko dla trybu gry z komputerem
@@ -66,7 +66,7 @@ chest/
 ## Instalacja
 
 ```bash
-git clone <adres-repozytorium>
+git clone https://github.com/piotrkkskalisz/chest.git
 cd chest
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
@@ -100,7 +100,7 @@ danych wejsciowych oraz komunikacje sieciowa - niezaleznie od interfejsu.
 
 ```bash
 # Windows
-build.bat
+.\build.bat
 # Linux / macOS
 ./build.sh
 ```
