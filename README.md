@@ -31,8 +31,6 @@ chest/
 ├── README.md
 ├── packaging/
 │   └── szachy.spec               # konfiguracja PyInstaller
-├── docs/
-│   └── documentation.html        # pelna dokumentacja techniczna
 ├── assets/                       # zasoby (puste - figury sa tekstowe)
 ├── database/
 │   ├── database.py               # warstwa dostepu do SQLite (uzytkownicy, gry)
