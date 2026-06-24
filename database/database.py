@@ -51,15 +51,17 @@ def init_database() -> None:
         conn.execute(CREATE_GAMES_TABLE)
         conn.commit()
 
-def create_user(username: str, password_hash: str) -> None:
+def create_user(username: str, password_hash: str) -> int:
     with _connect() as conn:
-        conn.execute(
+        cursor = conn.execute(
             """
             INSERT INTO Users(username, password_hash)
             VALUES (?, ?);
             """,
             (username, password_hash)
         )
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
 
 def get_user(username: str) -> tuple | None:
     """Return the user's ID, username, password hash and creation date, or None if the user does not exist."""
@@ -73,16 +75,16 @@ def get_user(username: str) -> tuple | None:
             (username,)
         ).fetchone()
 
-def load_game(game_id: int) -> str | None:
-    """Return the PGN of the specified game, or None if it does not exist."""    
+def load_game(user_id: int, game_id: int) -> str | None:
+    """Return the PGN of the specified game, or None if it does not exist or does not belong to the user."""
     with _connect() as conn:
         row = conn.execute(
             """
             SELECT pgn
             FROM Games
-            WHERE id = ?;
+            WHERE id = ? AND owner_id = ?;
             """,
-            (game_id,)
+            (game_id, user_id)
         ).fetchone()
 
     return row[0] if row else None
@@ -101,15 +103,17 @@ def load_all_games(owner_id: int)  -> list[tuple]:
             (owner_id,)
         ).fetchall()
 
-def save_game(user_id:int, pgn: str) -> None:
+def save_game(user_id:int, pgn: str) -> int:
     with _connect() as conn:
-        conn.execute(
+        cursor = conn.execute(
             """
             INSERT INTO Games(owner_id, pgn)
             VALUES (?, ?);
             """,
             (user_id, pgn)
         )
+        assert cursor.lastrowid is not None
+        return cursor.lastrowid
 
 if __name__ == "__main__":
     init_database()

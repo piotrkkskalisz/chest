@@ -299,14 +299,16 @@ class Game:
             node = node.add_variation(move)
         game.headers["Result"] = self._board.result()
         return str(game)
-
-    def save_game(self) -> None:
+        
+    def save_game(self) -> int:
         if self.user_id is None:
             raise ValueError("Zapis wymaga zalogowanego użytkownika.")
-        database.save_game(self.user_id, self.to_pgn())
+        return database.save_game(self.user_id, self.to_pgn())
 
     def load_game(self, game_id: int) -> None:
-        pgn = database.load_game(game_id)
+        if self.user_id is None:
+            raise ValueError("Ładowanie wymaga zalogowanego użytkownika.")
+        pgn = database.load_game(self.user_id, game_id)
         if pgn is None:
             raise ValueError("Game not found.")
 
